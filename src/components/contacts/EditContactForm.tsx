@@ -12,6 +12,13 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { supabase } from '@/lib/supabaseClient'
 import { toast } from 'react-toastify'
 import { useState, useEffect } from 'react'
@@ -34,6 +41,15 @@ interface EditContactFormProps {
   onSuccess: () => void; // Callback to close dialog and refetch
 }
 
+// Same status options
+// TODO: Move to shared constants
+const STATUS_OPTIONS = [
+  { value: 'Lead', label: 'Lead' },
+  { value: 'Prospect', label: 'Prospect' },
+  { value: 'Customer', label: 'Customer' },
+  { value: 'Lost', label: 'Lost' },
+];
+
 const EditContactForm: React.FC<EditContactFormProps> = ({ contact, onSuccess }) => {
   const [loading, setLoading] = useState(false);
 
@@ -45,8 +61,8 @@ const EditContactForm: React.FC<EditContactFormProps> = ({ contact, onSuccess })
       email: contact.email || "",
       company: contact.company || "",
       status: contact.status || "",
-      source: "", // Add source field if needed
-      notes: "", // Add notes field if needed
+      source: contact.source || "",
+      notes: contact.notes || "",
     },
   })
 
@@ -58,8 +74,8 @@ const EditContactForm: React.FC<EditContactFormProps> = ({ contact, onSuccess })
       email: contact.email || "",
       company: contact.company || "",
       status: contact.status || "",
-      source: contact.source || "", // Add source
-      notes: contact.notes || "", // Add notes
+      source: contact.source || "",
+      notes: contact.notes || "",
       // Don't reset id, user_id, created_at, updated_at as they aren't form fields
     });
     // Ensure form.reset is included in dependency array
@@ -147,9 +163,20 @@ const EditContactForm: React.FC<EditContactFormProps> = ({ contact, onSuccess })
           render={({ field }) => (
             <FormItem>
               <FormLabel>Status</FormLabel>
-              <FormControl>
-                <Input placeholder="Lead" {...field} disabled={loading} />
-              </FormControl>
+               <Select onValueChange={field.onChange} defaultValue={field.value} disabled={loading}>
+                 <FormControl>
+                   <SelectTrigger>
+                     <SelectValue placeholder="Select a status" />
+                   </SelectTrigger>
+                 </FormControl>
+                 <SelectContent>
+                   {STATUS_OPTIONS.map((option) => (
+                     <SelectItem key={option.value} value={option.value}>
+                       {option.label}
+                     </SelectItem>
+                   ))}
+                 </SelectContent>
+               </Select>
               <FormMessage />
             </FormItem>
           )}

@@ -12,6 +12,13 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { supabase } from '@/lib/supabaseClient'
 import { toast } from 'react-toastify'
 import { useState } from 'react'
@@ -35,6 +42,15 @@ interface CreateContactFormProps {
   onSuccess: () => void; // Callback to close dialog and refetch
 }
 
+// Same status options as in ContactsPage
+// TODO: Move this to a shared constants file
+const STATUS_OPTIONS = [
+  { value: 'Lead', label: 'Lead' },
+  { value: 'Prospect', label: 'Prospect' },
+  { value: 'Customer', label: 'Customer' },
+  { value: 'Lost', label: 'Lost' },
+];
+
 const CreateContactForm: React.FC<CreateContactFormProps> = ({ onSuccess }) => {
   const { user } = useAuth(); // Needed to set user_id
   const [loading, setLoading] = useState(false);
@@ -45,7 +61,7 @@ const CreateContactForm: React.FC<CreateContactFormProps> = ({ onSuccess }) => {
       name: "",
       email: "",
       company: "",
-      status: "", // Set a default status if desired
+      status: "Lead", // Default to Lead, or leave empty: ""
       source: "",
       notes: "",
     },
@@ -129,17 +145,26 @@ const CreateContactForm: React.FC<CreateContactFormProps> = ({ onSuccess }) => {
             </FormItem>
           )}
         />
-        {/* Add fields for status, source, tags later - potentially using Select for status */}
-         <FormField
+        <FormField
           control={form.control}
           name="status"
           render={({ field }) => (
             <FormItem>
               <FormLabel>Status</FormLabel>
-              <FormControl>
-                <Input placeholder="Lead" {...field} disabled={loading} /> 
-                 {/* Replace with Select component later */}
-              </FormControl>
+              <Select onValueChange={field.onChange} defaultValue={field.value} disabled={loading}>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a status" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  {STATUS_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <FormMessage />
             </FormItem>
           )}

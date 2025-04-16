@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/contexts/AuthContext';
+import { toast } from 'react-toastify'; // Import toast
 import {
   Table,
   TableBody,
@@ -11,6 +12,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Button } from '@/components/ui/button';
+import { Input } from "@/components/ui/input"; // Import Input
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,9 +30,35 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger, // We might trigger differently
+} from "@/components/ui/alert-dialog"
 import CreateContactForm from '@/components/contacts/CreateContactForm';
 import EditContactForm from '@/components/contacts/EditContactForm';
 import { Contact } from '@/types'; // Import Contact type from shared file
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select" // Import Select components
+
+// Define status options (consider moving to a constants file later)
+const STATUS_OPTIONS = [
+  { value: 'Lead', label: 'Lead' },
+  { value: 'Prospect', label: 'Prospect' },
+  { value: 'Customer', label: 'Customer' },
+  { value: 'Lost', label: 'Lost' },
+];
 
 const ContactsPage = () => {
   const { user } = useAuth();
@@ -40,15 +68,36 @@ const ContactsPage = () => {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false); // State for delete dialog
+  const [deletingContactId, setDeletingContactId] = useState<string | null>(null); // State for contact ID to delete
+  const [isDeleting, setIsDeleting] = useState(false); // Loading state for delete operation
+  const [searchTerm, setSearchTerm] = useState(""); // State for search term
+  const [selectedStatus, setSelectedStatus] = useState<string>("all"); // State for status filter ("all" means no filter)
+  const [updatingStatusId, setUpdatingStatusId] = useState<string | null>(null); // Track which contact status is being updated
 
-  const fetchContacts = useCallback(async () => {
+  const fetchContacts = useCallback(async (currentSearchTerm: string, currentStatus: string) => {
     setLoading(true);
     setError(null);
     try {
-      const { data, error: fetchError } = await supabase
+      let query = supabase
         .from('contacts')
-        .select('id, user_id, name, email, company, status, source, tags, notes, created_at, updated_at')
-        .order('created_at', { ascending: false });
+        .select('id, user_id, name, email, company, status, source, tags, notes, created_at, updated_at');
+
+      if (currentSearchTerm) {
+        query = query.or(`name.ilike.%${currentSearchTerm}%,email.ilike.%${currentSearchTerm}%,company.ilike.%${currentSearchTerm}%`);
+      }
+      
+      if (currentStatus !== "all") {
+        query = query.eq('status', currentStatus);
+      }
+
+      if (user) { 
+         query = query.eq('user_id', user.id); 
+      }
+
+      query = query.order('created_at', { ascending: false });
+
+      const { data, error: fetchError } = await query;
 
       if (fetchError) {
         throw fetchError;
@@ -60,15 +109,15 @@ const ContactsPage = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
-    fetchContacts();
-  }, [fetchContacts]);
+    fetchContacts(searchTerm, selectedStatus);
+  }, [fetchContacts, searchTerm, selectedStatus]);
 
   const handleCreateSuccess = () => {
     setIsCreateDialogOpen(false);
-    fetchContacts();
+    fetchContacts(searchTerm, selectedStatus);
   };
 
   const handleEdit = (contact: Contact) => {
@@ -79,12 +128,68 @@ const ContactsPage = () => {
   const handleEditSuccess = () => {
     setIsEditDialogOpen(false);
     setEditingContact(null);
-    fetchContacts();
+    fetchContacts(searchTerm, selectedStatus);
   };
 
   const handleDelete = (contactId: string) => {
-    console.log('Delete contact ID:', contactId);
-    // We will implement the Delete confirmation later
+    setDeletingContactId(contactId);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!deletingContactId) return;
+
+    setIsDeleting(true);
+    try {
+      const { error } = await supabase
+        .from('contacts')
+        .delete()
+        .eq('id', deletingContactId);
+
+      if (error) throw error;
+
+      toast.success('Contact deleted successfully!');
+      setDeletingContactId(null);
+      setIsDeleteDialogOpen(false);
+      fetchContacts(searchTerm, selectedStatus);
+    } catch (error: any) {
+      console.error("Error deleting contact:", error);
+      toast.error(error.error_description || error.message || 'Failed to delete contact.');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  // Function to handle inline status update
+  const handleStatusChange = async (contactId: string, newStatus: string) => {
+    setUpdatingStatusId(contactId); // Set loading state for this specific row
+    try {
+      const { error } = await supabase
+        .from('contacts')
+        .update({ status: newStatus })
+        .eq('id', contactId)
+        .select('id') // Select minimal data to confirm update
+
+      if (error) throw error;
+
+      toast.success('Status updated!');
+      // Optimistic update (optional) or refetch
+      // To keep it simple, we refetch if the filter *was* based on status
+      if (selectedStatus !== 'all') {
+          fetchContacts(searchTerm, selectedStatus);
+      } else {
+          // Or update local state for faster feedback without full refetch
+          setContacts(prevContacts => 
+              prevContacts.map(c => c.id === contactId ? { ...c, status: newStatus } : c)
+          );
+      }
+
+    } catch (error: any) {
+      console.error("Error updating status:", error);
+      toast.error(error.error_description || error.message || 'Failed to update status.');
+    } finally {
+      setUpdatingStatusId(null); // Clear loading state for this row
+    }
   };
 
   return (
@@ -107,13 +212,32 @@ const ContactsPage = () => {
         </Dialog>
       </div>
 
-      {/* Display Loading State */}
+      <div className="flex space-x-4 mb-4">
+        <Input 
+          placeholder="Search by name, email, company..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="max-w-sm"
+        />
+        <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="Filter by Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Statuses</SelectItem>
+            {STATUS_OPTIONS.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
       {loading && <p>Loading contacts...</p>}
 
-      {/* Display Error State */}
       {error && <p className="text-red-500">Error: {error}</p>}
 
-      {/* Display Table when not loading and no error */}
       {!loading && !error && (
         <Table>
           <TableHeader>
@@ -133,7 +257,25 @@ const ContactsPage = () => {
                   <TableCell className="font-medium">{contact.name}</TableCell>
                   <TableCell>{contact.email}</TableCell>
                   <TableCell>{contact.company ?? '-'}</TableCell>
-                  <TableCell>{contact.status ?? '-'}</TableCell>
+                  <TableCell>
+                    <Select 
+                      value={contact.status || ''} 
+                      onValueChange={(newStatus) => handleStatusChange(contact.id, newStatus)}
+                      disabled={updatingStatusId === contact.id} // Disable while this row is updating
+                    >
+                      <SelectTrigger className="w-[120px] h-8 text-xs">
+                         {/* Show current status or placeholder */}
+                        <SelectValue placeholder="Set Status" /> 
+                      </SelectTrigger>
+                      <SelectContent>
+                        {STATUS_OPTIONS.map((option) => (
+                          <SelectItem key={option.value} value={option.value} className="text-xs">
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </TableCell>
                   <TableCell>{new Date(contact.created_at).toLocaleDateString()}</TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>
@@ -161,7 +303,7 @@ const ContactsPage = () => {
             ) : (
               <TableRow>
                 <TableCell colSpan={6} className="h-24 text-center">
-                  No contacts found.
+                  No contacts found {searchTerm && "matching your search"}.
                 </TableCell>
               </TableRow>
             )}
@@ -185,6 +327,25 @@ const ContactsPage = () => {
           </DialogContent>
         </Dialog>
       )}
+
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the contact.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setDeletingContactId(null)} disabled={isDeleting}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} disabled={isDeleting} className="bg-red-600 hover:bg-red-700">
+              {isDeleting ? 'Deleting...' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
