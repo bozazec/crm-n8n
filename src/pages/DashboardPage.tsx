@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from '@/lib/supabaseClient';
-import { ActivityLog } from '@/types';
+import { ActivityLog, Contact } from '@/types';
 import {
   startOfWeek, 
   endOfWeek, 
@@ -14,6 +14,7 @@ import {
 } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { X } from 'lucide-react';
 
 // Placeholder for Reminder Details Panel (create later)
 // import ReminderDetailsPanel from '@/components/reminders/ReminderDetailsPanel';
@@ -41,6 +42,23 @@ const fetchRemindersForRange = async (userId: string | undefined, startDate: Dat
   return data || [];
 };
 
+// Function to fetch a single contact by ID
+const fetchContactById = async (contactId: string | null | undefined): Promise<Contact | null> => {
+  if (!contactId) {
+    return null;
+  }
+  const { data, error } = await supabase
+    .from('contacts')
+    .select('*')
+    .eq('id', contactId)
+    .maybeSingle();
+  if (error) {
+    console.error("Error fetching contact:", error);
+    throw new Error(error.message || 'Failed to fetch contact details.');
+  }
+  return data;
+};
+
 const DashboardPage = () => {
   const { user } = useAuth();
   const [selectedReminder, setSelectedReminder] = useState<ActivityLog | null>(null);
@@ -56,9 +74,9 @@ const DashboardPage = () => {
   // --- Use TanStack Query --- 
   const { 
     data: reminders = [], // Default to empty array
-    isLoading, 
-    isError,
-    error 
+    isLoading: isLoadingReminders, 
+    isError: isErrorReminders,
+    error: errorReminders 
   } = useQuery<ActivityLog[], Error>({
     // Query key includes user ID and dates to refetch if they change
     queryKey: ['reminders', user?.id, startOfPrevWeek, endOfNextWeek],
@@ -67,6 +85,22 @@ const DashboardPage = () => {
     // Only run the query if the user is logged in
     enabled: !!user, 
     // Optional: Configure staleTime, cacheTime etc. if needed
+    // staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+
+  // --- React Query for Selected Contact Details --- 
+  const selectedContactId = selectedReminder?.contact_id; // Get ID from selected reminder
+  const { 
+    data: contactDetails, 
+    isLoading: isLoadingContact, 
+    isError: isErrorContact, 
+    error: errorContact 
+  } = useQuery<Contact | null, Error>({
+    queryKey: ['contact', selectedContactId], // Depends on selectedContactId
+    queryFn: () => fetchContactById(selectedContactId),
+    // Only run the query if a contact ID is available
+    enabled: !!selectedContactId, 
+    // Optional: Add staleTime if desired
     // staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
@@ -104,9 +138,9 @@ const DashboardPage = () => {
       <h2 className="text-2xl font-semibold mb-4">Reminders Preview</h2>
 
       {/* Reminder Grid Area - Use isLoading, isError from useQuery */}
-      {isLoading && <p>Loading reminders...</p>}
-      {isError && <p className="text-red-500">Error: {error?.message || 'Failed to load reminders'}</p>}
-      {!isLoading && !isError && (
+      {isLoadingReminders && <p>Loading reminders...</p>}
+      {isErrorReminders && <p className="text-red-500">Error: {errorReminders?.message || 'Failed to load reminders'}</p>}
+      {!isLoadingReminders && !isErrorReminders && (
         <div className="border rounded-md overflow-hidden">
           {/* Grid Header (Days of Week) */}
           <div className="grid grid-cols-7 bg-muted/50 font-semibold text-sm">
@@ -163,18 +197,54 @@ const DashboardPage = () => {
         </div>
       )}
 
-      {/* Reminder Details Panel (Placeholder for now) */}
+      {/* Reminder Details Section (Below Grid) */}
       {selectedReminder && (
-        <div className="fixed inset-y-0 right-0 w-1/3 max-w-md bg-background border-l shadow-lg p-6 overflow-y-auto z-10">
-            <p>Details for Reminder ID: {selectedReminder.id}</p>
-            <pre className="text-xs bg-muted p-2 rounded mt-2">{JSON.stringify(selectedReminder, null, 2)}</pre>
-            <Button onClick={() => setSelectedReminder(null)} variant="outline" size="sm" className="mt-4">Close</Button>
-          {/* Replace with actual ReminderDetailsPanel component later
-           <ReminderDetailsPanel 
-             reminder={selectedReminder}
-             onClose={() => setSelectedReminder(null)}
-           /> 
-          */}
+        <div className="mt-6 p-4 border rounded-md bg-muted/50">
+          <div className="flex justify-between items-start mb-4 pb-4 border-b">
+            <h3 className="text-lg font-semibold">Details</h3>
+            <Button onClick={() => setSelectedReminder(null)} variant="ghost" size="icon" className="-mt-2 -mr-2">
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+
+          {/* Two-column layout for details */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Left Column: Contact Details */}
+            <div>
+              <h4 className="font-semibold mb-2 text-base">Contact Info</h4>
+              {isLoadingContact && <p className="text-sm text-muted-foreground">Loading contact...</p>}
+              {isErrorContact && <p className="text-sm text-red-500">Error: {errorContact?.message || 'Failed to load contact'}</p>}
+              {contactDetails && (
+                <div className="space-y-1 text-sm">
+                  <p><span className="font-medium">Name:</span> {contactDetails.name}</p>
+                  <p><span className="font-medium">Email:</span> {contactDetails.email}</p>
+                  {contactDetails.company && 
+                    <p><span className="font-medium">Company:</span> {contactDetails.company}</p>
+                  }
+                  {contactDetails.status && 
+                     <p><span className="font-medium">Status:</span> {contactDetails.status}</p>
+                   }
+                  {/* Add other relevant contact fields */} 
+                </div>
+              )}
+              {!isLoadingContact && !isErrorContact && !contactDetails && (
+                 <p className="text-sm text-muted-foreground">Contact details not found.</p> 
+              )}
+            </div>
+
+            {/* Right Column: Reminder Details */}
+            <div>
+              <h4 className="font-semibold mb-2 text-base">Reminder Info</h4>
+              <div className="space-y-1 text-sm">
+                 <p><span className="font-medium">Action:</span> {selectedReminder.action}</p>
+                 {selectedReminder.description && 
+                   <p><span className="font-medium">Description:</span> {selectedReminder.description}</p>
+                 }
+                 <p><span className="font-medium">Date:</span> {selectedReminder.reminder_at ? format(new Date(selectedReminder.reminder_at), 'PPP') : 'N/A'}</p>
+                 <p><span className="font-medium">Logged:</span> {format(new Date(selectedReminder.created_at), 'Pp')}</p>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>
