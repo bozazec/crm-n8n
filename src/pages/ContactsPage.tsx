@@ -51,6 +51,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select" // Import Select components
+import ContactDetailsPanel from '@/components/contacts/ContactDetailsPanel';
 
 // Define status options (consider moving to a constants file later)
 const STATUS_OPTIONS = [
@@ -74,6 +75,7 @@ const ContactsPage = () => {
   const [searchTerm, setSearchTerm] = useState(""); // State for search term
   const [selectedStatus, setSelectedStatus] = useState<string>("all"); // State for status filter ("all" means no filter)
   const [updatingStatusId, setUpdatingStatusId] = useState<string | null>(null); // Track which contact status is being updated
+  const [selectedContactId, setSelectedContactId] = useState<string | null>(null); // State for selected contact ID
 
   const fetchContacts = useCallback(async (currentSearchTerm: string, currentStatus: string) => {
     setLoading(true);
@@ -192,160 +194,183 @@ const ContactsPage = () => {
     }
   };
 
+  // Function to handle row click
+  const handleRowClick = (contactId: string) => {
+    // If clicking the already selected row, deselect it, otherwise select the new one
+    setSelectedContactId(prevId => prevId === contactId ? null : contactId);
+  };
+
   return (
-    <div>
-      <div className="flex justify-between items-center mb-4">
-        <h1 className="text-3xl font-bold">Contacts</h1>
-        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>Create Contact</Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[425px]">
-            <DialogHeader>
-              <DialogTitle>Create New Contact</DialogTitle>
-              <DialogDescription>
-                Fill in the details below to add a new contact.
-              </DialogDescription>
-            </DialogHeader>
-            <CreateContactForm onSuccess={handleCreateSuccess} />
-          </DialogContent>
-        </Dialog>
-      </div>
+    // Use a flex container for two columns
+    <div className="flex h-[calc(100vh-theme(space.14))]"> {/* Adjust height based on header height */}
+      {/* Main Content Area (Filters + Table) */}
+      <div className={`flex-1 overflow-y-auto p-6 ${selectedContactId ? 'pr-0' : ''}`}> 
+        <div className="flex justify-between items-center mb-4">
+            <h1 className="text-3xl font-bold">Contacts</h1>
+            <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+              <DialogTrigger asChild>
+                <Button>Create Contact</Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                  <DialogTitle>Create New Contact</DialogTitle>
+                  <DialogDescription>
+                    Fill in the details below to add a new contact.
+                  </DialogDescription>
+                </DialogHeader>
+                <CreateContactForm onSuccess={handleCreateSuccess} />
+              </DialogContent>
+            </Dialog>
+        </div>
 
-      <div className="flex space-x-4 mb-4">
-        <Input 
-          placeholder="Search by name, email, company..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="max-w-sm"
-        />
-        <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Filter by Status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Statuses</SelectItem>
-            {STATUS_OPTIONS.map((option) => (
-              <SelectItem key={option.value} value={option.value}>
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+        <div className="flex space-x-4 mb-4">
+           <Input 
+             placeholder="Search by name, email, company..."
+             value={searchTerm}
+             onChange={(e) => setSearchTerm(e.target.value)}
+             className="max-w-sm"
+           />
+           <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+             <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Filter by Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Statuses</SelectItem>
+                {STATUS_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+        </div>
 
-      {loading && <p>Loading contacts...</p>}
+        {loading && <p>Loading contacts...</p>}
 
-      {error && <p className="text-red-500">Error: {error}</p>}
+        {error && <p className="text-red-500">Error: {error}</p>}
 
-      {!loading && !error && (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Company</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Created</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {contacts.length > 0 ? (
-              contacts.map((contact) => (
-                <TableRow key={contact.id}>
-                  <TableCell className="font-medium">{contact.name}</TableCell>
-                  <TableCell>{contact.email}</TableCell>
-                  <TableCell>{contact.company ?? '-'}</TableCell>
-                  <TableCell>
-                    <Select 
-                      value={contact.status || ''} 
-                      onValueChange={(newStatus) => handleStatusChange(contact.id, newStatus)}
-                      disabled={updatingStatusId === contact.id} // Disable while this row is updating
-                    >
-                      <SelectTrigger className="w-[120px] h-8 text-xs">
-                         {/* Show current status or placeholder */}
-                        <SelectValue placeholder="Set Status" /> 
-                      </SelectTrigger>
-                      <SelectContent>
-                        {STATUS_OPTIONS.map((option) => (
-                          <SelectItem key={option.value} value={option.value} className="text-xs">
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </TableCell>
-                  <TableCell>{new Date(contact.created_at).toLocaleDateString()}</TableCell>
-                  <TableCell className="text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p-0">
-                          <span className="sr-only">Open menu</span>
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleEdit(contact)}>
-                          Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => handleDelete(contact.id)}
-                          className="text-red-600 focus:text-red-600 focus:bg-red-50"
-                        >
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))
-            ) : (
+        {!loading && !error && (
+          <Table>
+            <TableHeader>
               <TableRow>
-                <TableCell colSpan={6} className="h-24 text-center">
-                  No contacts found {searchTerm && "matching your search"}.
-                </TableCell>
+                <TableHead>Name</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Company</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Created</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      )}
+            </TableHeader>
+            <TableBody>
+              {contacts.length > 0 ? (
+                contacts.map((contact) => (
+                  <TableRow 
+                    key={contact.id} 
+                    onClick={() => handleRowClick(contact.id)} 
+                    className={`cursor-pointer hover:bg-muted/50 ${selectedContactId === contact.id ? 'bg-muted' : ''}`}
+                  >
+                    <TableCell className="font-medium">{contact.name}</TableCell>
+                    <TableCell>{contact.email}</TableCell>
+                    <TableCell>{contact.company ?? '-'}</TableCell>
+                    <TableCell onClick={(e: React.MouseEvent) => e.stopPropagation()}> 
+                      <Select 
+                        value={contact.status || ''} 
+                        onValueChange={(newStatus) => handleStatusChange(contact.id, newStatus)}
+                        disabled={updatingStatusId === contact.id} 
+                      >
+                        <SelectTrigger className="w-[120px] h-8 text-xs">
+                          <SelectValue placeholder="Set Status" /> 
+                        </SelectTrigger>
+                        <SelectContent>
+                          {STATUS_OPTIONS.map((option) => (
+                            <SelectItem key={option.value} value={option.value} className="text-xs">
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                    <TableCell>{new Date(contact.created_at).toLocaleDateString()}</TableCell>
+                    <TableCell className="text-right" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild> 
+                          <Button variant="ghost" className="h-8 w-8 p-0">
+                            <span className="sr-only">Open menu</span>
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleEdit(contact)}>
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              onClick={() => handleDelete(contact.id)}
+                              className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                            >
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                     <TableCell colSpan={6} className="h-24 text-center">
+                       No contacts found {searchTerm && "matching your search"}.
+                     </TableCell>
+                   </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        )}
 
-      {editingContact && (
-        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-          <DialogContent className="sm:max-w-[425px]">
-            <DialogHeader>
-              <DialogTitle>Edit Contact</DialogTitle>
-              <DialogDescription>
-                Update the contact details below.
-              </DialogDescription>
-            </DialogHeader>
-            <EditContactForm 
-              contact={editingContact} 
-              onSuccess={handleEditSuccess} 
-            />
-          </DialogContent>
-        </Dialog>
-      )}
+        {editingContact && (
+          <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+            <DialogContent className="sm:max-w-[425px]">
+              <DialogHeader>
+                <DialogTitle>Edit Contact</DialogTitle>
+                <DialogDescription>
+                  Update the contact details below.
+                </DialogDescription>
+              </DialogHeader>
+              <EditContactForm 
+                contact={editingContact} 
+                onSuccess={handleEditSuccess} 
+              />
+            </DialogContent>
+          </Dialog>
+        )}
 
-      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the contact.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setDeletingContactId(null)} disabled={isDeleting}>
-              Cancel
-            </AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} disabled={isDeleting} className="bg-red-600 hover:bg-red-700">
-              {isDeleting ? 'Deleting...' : 'Delete'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This action cannot be undone. This will permanently delete the contact.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setDeletingContactId(null)} disabled={isDeleting}>
+                Cancel
+              </AlertDialogCancel>
+              <AlertDialogAction onClick={confirmDelete} disabled={isDeleting} className="bg-red-600 hover:bg-red-700">
+                {isDeleting ? 'Deleting...' : 'Delete'}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div> 
+
+      {/* Details Panel Area */}
+      {selectedContactId && (
+        <div className="w-1/3 border-l bg-background overflow-y-auto p-6">
+          <ContactDetailsPanel 
+            contactId={selectedContactId} 
+            onClose={() => setSelectedContactId(null)} // Add a way to close the panel
+          />
+        </div>
+      )}
     </div>
   );
 };

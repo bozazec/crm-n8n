@@ -74,7 +74,8 @@ const CreateContactForm: React.FC<CreateContactFormProps> = ({ onSuccess }) => {
     }
     setLoading(true);
     try {
-      const { error } = await supabase
+      // Insert the contact and select the newly created record
+      const { data: newContactData, error: contactError } = await supabase
         .from('contacts')
         .insert([
           {
@@ -85,16 +86,44 @@ const CreateContactForm: React.FC<CreateContactFormProps> = ({ onSuccess }) => {
             status: values.status || null,
             source: values.source || null,
             notes: values.notes || null,
-            // tags: values.tags || [], // Add tags if handling them
           }
         ])
-        .select() // Select to check if insert worked (returns data/error)
+        .select() // Select the inserted record
+        .single(); // Expecting a single record back
 
-      if (error) throw error;
+      if (contactError) throw contactError;
+
+      if (!newContactData) {
+        throw new Error("Failed to create contact or retrieve new contact ID.");
+      }
 
       toast.success('Contact created successfully!');
-      form.reset(); // Reset form fields
-      onSuccess(); // Call the success callback
+      
+      // --- Automatic Activity Logging --- 
+      try {
+          const { error: logError } = await supabase
+            .from('activity_logs')
+            .insert([
+              {
+                user_id: user.id,
+                contact_id: newContactData.id, // Use the ID from the created contact
+                action: 'Created',
+                description: `Contact ${newContactData.name} created.`, // Optional description
+              }
+            ]);
+          
+          if (logError) {
+              // Log the error but don't necessarily block the user 
+              console.error("Error logging contact creation activity:", logError);
+              toast.warning('Contact created, but failed to log activity.'); 
+          }
+      } catch(logCatchError) {
+          console.error("Error in activity logging block:", logCatchError);
+      }
+      // --- End Automatic Activity Logging ---
+
+      form.reset();
+      onSuccess(); // Call the success callback (closes dialog, refetches contacts)
     } catch (error: any) {
       console.error("Error creating contact:", error);
       toast.error(error.error_description || error.message || 'Failed to create contact.');

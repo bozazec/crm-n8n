@@ -9,27 +9,33 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { CircleUserRound } from 'lucide-react'; // Icon for user menu
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 
 const Header = () => {
   const { user, signOut, loading } = useAuth();
+  const location = useLocation(); // Get location object
+  const pathname = location.pathname; // Get current path
+
+  // Helper function for nav link classes
+  const getNavLinkClass = (path: string) => {
+    return pathname === path
+      ? "transition-colors text-foreground" // Active style
+      : "transition-colors text-foreground/60 hover:text-foreground/80"; // Inactive style
+  };
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container flex h-14 items-center">
+    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4">
+      <div className="flex h-14 items-center">
         <div className="mr-4 hidden md:flex">
-          <Link to="/" className="mr-6 flex items-center space-x-2">
-            {/* <Icons.logo className="h-6 w-6" /> Replace with actual logo if you have one */}
-            <span className="hidden font-bold sm:inline-block">
-              NoOps CRM
-            </span>
-          </Link>
           <nav className="flex items-center space-x-6 text-sm font-medium">
-            <Link
-              to="/contacts"
-              className="transition-colors hover:text-foreground/80 text-foreground/60"
-            >
+            <Link to="/" className={getNavLinkClass('/')}>
+              Dashboard
+            </Link>
+            <Link to="/contacts" className={getNavLinkClass('/contacts')}>
               Contacts
+            </Link>
+            <Link to="/webhooks" className={getNavLinkClass('/webhooks')}>
+              Webhooks
             </Link>
             {/* Add other nav links like Settings here */}
           </nav>

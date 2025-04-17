@@ -11,6 +11,7 @@ import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import DashboardPage from './pages/DashboardPage'
 import ContactsPage from './pages/ContactsPage'
+import WebhooksPage from './pages/WebhooksPage'
 
 // Placeholder for dashboard
 // const DashboardPage = () => <div>Dashboard Page (Protected)</div>;
@@ -31,6 +32,7 @@ function App() {
             <Route element={<MainLayout />}>
               <Route path="/" element={<DashboardPage />} />
               <Route path="/contacts" element={<ContactsPage />} />
+              <Route path="/webhooks" element={<WebhooksPage />} />
               {/* Add other protected routes here: /settings etc. */}
             </Route>
           </Route>
