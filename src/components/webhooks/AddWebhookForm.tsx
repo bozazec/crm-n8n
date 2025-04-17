@@ -29,12 +29,15 @@ import { useAuth } from '@/contexts/AuthContext'
 const EVENT_TRIGGERS = [
   { value: 'contact.created', label: 'Contact Created' },
   { value: 'contact.updated', label: 'Contact Updated' },
+  { value: 'activity.created', label: 'Activity Updated' },
 ];
 
 // Validation Schema
 const webhookFormSchema = z.object({
   event_trigger: z.string().min(1, { message: "Event trigger is required." }),
-  url: z.string().url({ message: "Invalid webhook URL." }),
+  url: z.string()
+         .min(1, { message: "Webhook path is required." })
+         .startsWith('/', { message: "Path must start with /" }),
   description: z.string().optional(),
 });
 
@@ -128,9 +131,9 @@ const AddWebhookForm: React.FC<AddWebhookFormProps> = ({ onSuccess }) => {
           name="url"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Webhook URL *</FormLabel>
+              <FormLabel>Webhook Path *</FormLabel>
               <FormControl>
-                <Input placeholder="https://your.n8n.instance/webhook/..." {...field} disabled={loading} />
+                <Input placeholder="/webhook/your-n8n-webhook-path" {...field} disabled={loading} />
               </FormControl>
               <FormMessage />
             </FormItem>

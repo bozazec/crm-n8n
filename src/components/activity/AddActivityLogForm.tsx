@@ -17,6 +17,7 @@ import { toast } from 'react-toastify'
 import { useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { DatePicker } from "@/components/ui/date-picker"
+import { triggerWebhook } from '@/lib/webhookUtils'
 
 // Define common actions (can be expanded)
 const ACTIVITY_ACTIONS = [
@@ -61,7 +62,7 @@ const AddActivityLogForm: React.FC<AddActivityLogFormProps> = ({ contactId, onSu
         ? values.reminder_at.toISOString() 
         : null;
 
-      const { error } = await supabase
+      const { data: newActivity, error } = await supabase
         .from('activity_logs')
         .insert([
           {
@@ -72,9 +73,14 @@ const AddActivityLogForm: React.FC<AddActivityLogFormProps> = ({ contactId, onSu
             reminder_at: reminderTimestamp,
           }
         ])
-        .select();
+        .select()
+        .single();
 
       if (error) throw error;
+
+      if (newActivity) {
+        triggerWebhook('activity.created', { userId: user.id, data: newActivity });
+      }
 
       toast.success('Activity logged successfully!');
       form.reset();
