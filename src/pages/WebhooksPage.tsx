@@ -1,6 +1,5 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabaseClient';
-import { useAuth } from '@/contexts/AuthContext';
 import { Webhook } from '@/types';
 import { toast } from 'react-toastify';
 import {
@@ -38,11 +37,9 @@ import {
     AlertDialogFooter,
     AlertDialogHeader,
     AlertDialogTitle,
-    AlertDialogTrigger,
   } from "@/components/ui/alert-dialog"
 
 const WebhooksPage = () => {
-  const { user } = useAuth();
   const [webhooks, setWebhooks] = useState<Webhook[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
