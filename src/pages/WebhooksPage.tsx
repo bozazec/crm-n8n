@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from '@/contexts/AuthContext';
 import { Webhook } from '@/types';
+import { toast } from 'react-toastify';
 import {
   Table,
   TableBody,
@@ -27,6 +28,18 @@ import {
     DialogTrigger,
   } from "@/components/ui/dialog"
 import AddWebhookForm from '@/components/webhooks/AddWebhookForm';
+import EditWebhookForm from '@/components/webhooks/EditWebhookForm';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger,
+  } from "@/components/ui/alert-dialog"
 
 const WebhooksPage = () => {
   const { user } = useAuth();
@@ -34,6 +47,8 @@ const WebhooksPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [webhookToDelete, setWebhookToDelete] = useState<Webhook | null>(null);
+  const [webhookToEdit, setWebhookToEdit] = useState<Webhook | null>(null);
 
   const fetchWebhooks = useCallback(async () => {
     setLoading(true);
@@ -64,14 +79,40 @@ const WebhooksPage = () => {
       fetchWebhooks();
   };
 
-  // Placeholder action handlers
   const handleEdit = (webhook: Webhook) => {
-      console.log("Edit webhook:", webhook);
-      // Add Edit dialog logic later
+    setWebhookToEdit(webhook);
   };
-  const handleDelete = (webhookId: string) => {
-      console.log("Delete webhook ID:", webhookId);
-      // Add Delete confirmation logic later
+
+  const handleEditSuccess = () => {
+    setWebhookToEdit(null);
+    fetchWebhooks();
+  };
+
+  const requestDeleteWebhook = (webhook: Webhook) => {
+    setWebhookToDelete(webhook);
+  };
+
+  const confirmDeleteWebhook = async () => {
+    if (!webhookToDelete) return;
+    setLoading(true);
+    try {
+      const { error: deleteError } = await supabase
+        .from('webhooks')
+        .delete()
+        .eq('id', webhookToDelete.id);
+
+      if (deleteError) throw deleteError;
+
+      toast.success(`Webhook for "${webhookToDelete.event_trigger}" deleted successfully!`);
+      setWebhookToDelete(null);
+      fetchWebhooks();
+    } catch (err: any) {
+      console.error("Error deleting webhook:", err);
+      toast.error(err.message || 'Failed to delete webhook.');
+      setError(err.message || 'Failed to delete webhook.');
+    } finally {
+        setLoading(false);
+    }
   };
 
   return (
@@ -97,11 +138,9 @@ const WebhooksPage = () => {
             Connect CRM events to your n8n workflows.
         </p>
 
-        {/* Loading / Error states */}
         {loading && <p>Loading webhooks...</p>}
         {error && <p className="text-red-500">Error: {error}</p>}
 
-        {/* Webhook Table */}
         {!loading && !error && (
              <Table>
                 <TableHeader>
@@ -119,7 +158,6 @@ const WebhooksPage = () => {
                         <TableRow key={webhook.id}>
                         <TableCell className="font-medium">{webhook.event_trigger}</TableCell>
                         <TableCell>{webhook.description ?? '-'}</TableCell>
-                        {/* Truncate long URLs potentially */}
                         <TableCell className="max-w-xs truncate" title={webhook.url}>{webhook.url}</TableCell>
                         <TableCell>{new Date(webhook.created_at).toLocaleDateString()}</TableCell>
                         <TableCell className="text-right">
@@ -134,8 +172,8 @@ const WebhooksPage = () => {
                                 <DropdownMenuItem onClick={() => handleEdit(webhook)}>
                                 Edit
                                 </DropdownMenuItem>
-                                <DropdownMenuItem 
-                                  onClick={() => handleDelete(webhook.id)}
+                                <DropdownMenuItem
+                                  onClick={() => requestDeleteWebhook(webhook)}
                                   className="text-red-600 focus:text-red-600 focus:bg-red-50"
                                 >
                                 Delete
@@ -155,6 +193,43 @@ const WebhooksPage = () => {
                 </TableBody>
             </Table>
         )}
+
+        <AlertDialog open={!!webhookToDelete} onOpenChange={(open) => !open && setWebhookToDelete(null)}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                <AlertDialogDescription>
+                    This action cannot be undone. This will permanently delete the webhook triggering on
+                    <span className="font-semibold"> {webhookToDelete?.event_trigger}</span>
+                    {webhookToDelete?.description && ` (${webhookToDelete.description})`}.
+                </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                <AlertDialogCancel onClick={() => setWebhookToDelete(null)}>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={confirmDeleteWebhook} disabled={loading} className="bg-red-600 hover:bg-red-700">
+                    {loading ? 'Deleting...' : 'Delete'}
+                </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+
+        <Dialog open={!!webhookToEdit} onOpenChange={(open) => !open && setWebhookToEdit(null)}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Edit Webhook</DialogTitle>
+              <DialogDescription>
+                Update the path or description for the <span className="font-semibold">{webhookToEdit?.event_trigger}</span> trigger.
+              </DialogDescription>
+            </DialogHeader>
+            {webhookToEdit && (
+              <EditWebhookForm 
+                webhook={webhookToEdit} 
+                onSuccess={handleEditSuccess} 
+              />
+            )}
+          </DialogContent>
+        </Dialog>
+
     </div>
   );
 };
