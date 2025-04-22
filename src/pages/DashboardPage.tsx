@@ -114,7 +114,7 @@ const DashboardPage = () => {
   // Group reminders by date (YYYY-MM-DD format for easy lookup)
   const remindersByDate = useMemo(() => {
     const map = new Map<string, ActivityLog[]>();
-    reminders.forEach(reminder => {
+    reminders.forEach((reminder: ActivityLog) => {
       if (reminder.reminder_at) {
         // Fix: Directly extract the date part from the ISO string (UTC date)
         // This avoids local timezone conversion during grouping.
