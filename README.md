@@ -2,6 +2,13 @@
 
 This project is a lightweight Customer Relationship Management (CRM) application built with React, TypeScript, and Supabase. It allows users to manage contacts, log activities, and configure webhooks to trigger n8n workflows based on specific CRM events.
 
+## Try the demo
+Go to https://visionary-liger-23d2af.netlify.app/
+1. create account
+2. go to your email and confirm by click on the link
+3. boom you are logged in
+4. you can pump now (PUMPAJ)
+
 // add image
 ![CRM N8N APP](./src/assets/screenshot.png "Screenshot")
 
