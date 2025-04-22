@@ -5,7 +5,6 @@ import { toast } from 'react-toastify'; // Import toast
 import {
   Table,
   TableBody,
-  TableCaption,
   TableCell,
   TableHead,
   TableHeader,
@@ -39,7 +38,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger, // We might trigger differently
 } from "@/components/ui/alert-dialog"
 import CreateContactForm from '@/components/contacts/CreateContactForm';
 import EditContactForm from '@/components/contacts/EditContactForm';
